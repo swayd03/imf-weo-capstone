@@ -1,0 +1,107 @@
+# Drivers of National Economic Resilience
+
+**Swadha Singh** · Student No. 246101554
+Predictive Analytics — Capstone Project · Faculty: Prof. Dr. Varsha P S
+
+A capstone analysis of the **IMF World Economic Outlook (April 2026 vintage)** — 2,901 country-year
+observations covering 196 economies from 2016 to 2030.
+
+## Problem statement
+
+**Part A — Explanatory modelling.** The dataset assigns every country-year a composite
+`Economic_Resilience_Score` (0–100) whose construction is undocumented. Which macroeconomic
+fundamentals drive it, how much of it can be explained, and can an economy be classified as
+"high-resilience" from its fundamentals alone?
+
+**Part B — Forecasting.** Can classical smoothing methods reproduce India's nominal GDP trajectory,
+and how does a purely statistical forecast for 2026–2030 compare with the IMF's own judgement-based
+staff projection contained in the same file?
+
+## Data
+
+| | |
+|---|---|
+| Source | IMF World Economic Outlook, April 2026 vintage (scraped 2026-04-14) |
+| Rows | 2,901 country-year observations (1,953 actuals 2016–2025, 948 forecasts 2026–2030) |
+| Countries | 196 — no aggregate regions |
+| Modelling sample | 1,890 rows after cleaning |
+
+### Targets
+| Task | Target | Type |
+|---|---|---|
+| Multiple linear regression | `Economic_Resilience_Score` | Continuous 0–100 |
+| Logistic regression & decision tree | `High_Resilience` = 1 if score ≥ 70 | Binary (engineered, 34% positive) |
+| Time series | `GDP_Nominal_USD_Bn` (India) | Continuous, annual |
+
+### Features
+`Real_GDP_Growth_Pct`, `Inflation_CPI_Pct`, `Govt_Gross_Debt_Pct_GDP`, `Govt_Net_Lending_Pct_GDP`,
+`Current_Account_Pct_GDP`, `Unemployment_Rate_Pct`, `log_GDP_Per_Capita`, `log_Population`
+
+**Excluded by design:** `Real_Purchasing_Power_Growth` (verified to be the exact identity
+growth − inflation), `Govt_Revenue_Pct_GDP` and both trade-volume series (>50% missing), and
+`GDP_Growth_Momentum_3Y` (a rolling mean containing year *t*, so not observable in real time).
+
+## Methods
+
+1. **Data description & classification** — measurement-scale classification of all 25 columns,
+   missingness audit, central tendency, dispersion, skew/kurtosis, correlation matrix.
+2. **Regression & feature selection** — OLS with VIF diagnostics and backward elimination,
+   logistic regression with odds ratios, decision tree with depth tuning and Gini importance,
+   plus a normalised consensus ranking across all three.
+3. **Time series** — moving average, single exponential smoothing, and Holt's double exponential
+   smoothing in both additive and multiplicative trend forms, validated on a 2023–2025 hold-out
+   and benchmarked against the IMF staff projection.
+
+## Headline results
+
+| Model | Metric | Result |
+|---|---|---|
+| OLS (7 features) | Adj. R² / Hold-out R² | 0.874 / 0.896 |
+| OLS | RMSE | 4.73 points of 100 |
+| Logistic regression | Accuracy / ROC-AUC | 96.6% / 0.995 |
+| Decision tree (depth 5) | Accuracy / ROC-AUC | 93.0% / 0.970 |
+| Moving average (k=3) | MAPE | 19.79% |
+| Single exponential smoothing | MAPE | 12.59% |
+| Holt — additive trend | MAPE | 7.62% |
+| **Holt — multiplicative trend** | **MAPE** | **5.34%** |
+
+### Findings
+
+1. **Three levers explain resilience.** Growth, debt and inflation rank 1-2-3 by standardised β
+   (+0.62, −0.43, −0.35), by logistic log-odds, and by Gini importance (0.50, 0.35, 0.15) — three
+   model families with different assumptions reaching an identical ranking.
+2. **Being rich is not the same as being resilient.** `log_GDP_Per_Capita` correlates with the
+   target at just +0.04 and is the only feature backward elimination removes (p = 0.38).
+3. **High-resilience status is near-perfectly separable** (AUC 0.995). The linear model beating the
+   tree indicates a close-to-linear decision boundary.
+4. **Series structure dictates method.** Level-only methods are structurally biased against a
+   trending series; adding a trend component cuts MAPE from 19.8% to 5.3%.
+5. **The forecast gap measures institutional judgement.** The IMF's implied nominal CAGR of 9.5%
+   for 2025–2030 exceeds India's realised 6.3% over 2016–2025 — a 3.3 pp assumed acceleration that
+   no univariate model can see in the history.
+
+## Limitations
+
+Panel observations are not independent, so standard errors are optimistic — a fixed-effects or
+clustered specification is the natural next step. Unemployment was imputed for 44% of rows. The
+resilience score is a vendor-constructed composite, so the regression recovers its construction as
+much as any economic law. The time-series work rests on ten annual observations for one country.
+
+## Repository contents
+
+```
+IMF_WEO_Capstone_Analysis.ipynb   Full analysis, 44 cells, executed with all outputs retained
+IMF_WEO_Capstone_Deck.pptx        15-slide presentation, interpretations in the speaker notes
+IMF_WEO_Capstone_Deck.pdf         Same deck as PDF, previewable directly in the browser
+imf_weo_april_2026.csv            Source data
+figures/                          11 charts generated by the notebook
+```
+
+## Reproducing
+
+```bash
+pip install pandas numpy matplotlib seaborn statsmodels scikit-learn jupyter
+jupyter nbconvert --to notebook --execute --inplace IMF_WEO_Capstone_Analysis.ipynb
+```
+
+Random seed is fixed at 42 throughout; all train/test splits are reproducible.
